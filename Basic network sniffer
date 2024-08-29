@@ -1,0 +1,78 @@
+import socket
+import struct
+def create_socket(): 
+    """Create a raw socket and bind it to the local machine.""" 
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_RAW, socket.IPPROTO_IP)
+        sock.bind(('0.0.0.0', 0)) 
+        sock.setsockopt(socket.IPPROTO_IP, socket.IP_HDRINCL, 1)
+        print("Socket created and bound successfully")
+        return sock
+    except socket.error as e:
+        print(f"Socket error: {e}")
+        return None
+def process_packet(packet): 
+    """Process and parse the captured packet."""
+    ip_header = packet[0:20]
+    iph = struct.unpack('!BBHHHBBH4s4s', ip_header)
+    version_ihl = iph[0]
+    version = version_ihl >> 4
+    ihl = version_ihl & 0xF
+    total_length = iph[2]
+    protocol = iph[6]
+    src_addr = socket.inet_ntoa(iph[8])
+    dst_addr = socket.inet_ntoa(iph[9])
+    print(f"\nPacket Information:")
+    print(f"Version: {version}")
+    print(f"IHL: {ihl}")
+    print(f"Total Length: {total_length}")
+    print(f"Protocol: {protocol}")
+    print(f"Source Address: {src_addr}")
+    print(f"Destination Address: {dst_addr}")
+    if protocol == 6: 
+        parse_tcp_header(packet[20:])
+    elif protocol == 17: 
+        parse_udp_header(packet[20:])
+    elif protocol == 1: 
+        parse_icmp_header(packet[20:])
+def parse_tcp_header(data): 
+    """Parse and print TCP header information.""" 
+    tcp_header = data[0:20]
+    tcph = struct.unpack('!HHLLBBHHH', tcp_header)
+    src_port = tcph[0]
+    dst_port = tcph[1]
+    print(f"TCP Source Port: {src_port}")
+    print(f"TCP Destination Port: {dst_port}")
+def parse_udp_header(data): 
+    """Parse and print UDP header information.""" 
+    udp_header = data[0:8]
+    udph = struct.unpack('!HHHH', udp_header)
+    src_port = udph[0]
+    dst_port = udph[1]
+    print(f"UDP Source Port: {src_port}")
+    print(f"UDP Destination Port: {dst_port}")
+def parse_icmp_header(data): 
+    """Parse and print ICMP header information."""
+    icmp_header = data[0:4]
+    icmph = struct.unpack('!BBH', icmp_header)
+    type = icmph[0]
+    code = icmph[1]
+    print(f"ICMP Type: {type}")
+    print(f"ICMP Code: {code}")
+def capture_packets(sock): 
+    """Capture packets from the socket."""
+    try:
+        while True:
+            packet = sock.recvfrom(65565)[0]
+            process_packet(packet)
+    except KeyboardInterrupt:
+            print("Sniffer stopped.")
+    finally:
+        sock.close()
+def main(): 
+    """Main function to initialize and start the packet sniffer.""" 
+    sock = create_socket()
+    if sock:
+        capture_packets(sock)
+if __name__ == "__main__":
+    main()
